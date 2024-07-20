@@ -84,7 +84,7 @@ public class Fractal : MonoBehaviour
             parts[i] = new NativeArray<FractalPart>(length, Allocator.Persistent);
             matrices[i] = new NativeArray<float3x4>(length, Allocator.Persistent);
             matricesBuffer[i] = new ComputeBuffer(length, stride);
-            sequenceNumbers[i] = new Vector4(Random.value, Random.value);
+            sequenceNumbers[i] = new Vector4(Random.value, Random.value, Random.value, Random.value);
         }
 
         parts[0][0] = CreatePart(0);
@@ -125,7 +125,7 @@ public class Fractal : MonoBehaviour
     }
 
     void Update() {
-        float spinDelta = 0.125f * PI * Time.deltaTime;
+        float spinDelta = 0.125f * PI * Time.deltaTime * 0f;
         FractalPart rootPart = parts[0][0];
         rootPart.spinAngle += spinDelta;
         rootPart.worldRotation = mul( transform.rotation , mul(rootPart.rotation , quaternion.RotateY(rootPart.spinAngle)));
