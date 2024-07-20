@@ -11,3 +11,16 @@ void ConfigureProcedural () {
         unity_ObjectToWorld._m30_m31_m32_m33 = float4(0.0, 0.0, 0.0, 1.0);
     #endif
 }
+
+float4 _ColorA;
+float4 _ColorB;
+float2 _SequenceNumbers;
+
+float4 GetFractalColor()
+{
+    #if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
+        return lerp(_ColorA, _ColorB, frac(unity_InstanceID * _SequenceNumbers.x + _SequenceNumbers.y));
+    #else
+        return _ColorA;
+    #endif
+}
