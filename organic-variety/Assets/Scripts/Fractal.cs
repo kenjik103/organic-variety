@@ -17,36 +17,6 @@ public class Fractal : MonoBehaviour
     [SerializeField] Gradient gradientA, gradientB;
     [SerializeField] Color leafColorA, leafColorB;
     
-    [BurstCompile(FloatPrecision.Standard, FloatMode.Fast, CompileSynchronously = true)]
-    struct UpdateFractalLevelJob : IJobFor
-    {
-        public float spinAngleDelta;
-        public float scale;
-
-        public NativeArray<FractalPart> parts;
-        
-        [ReadOnly]
-        public NativeArray<FractalPart> parents;
-        [WriteOnly]
-        public NativeArray<float3x4> matrices;
-        public void Execute(int i) {
-            FractalPart parent = parents[i / 5];
-            FractalPart part = parts[i];
-            part.spinAngle += spinAngleDelta;
-            part.worldRotation = mul(parent.worldRotation , mul(part.rotation, quaternion.RotateY(part.spinAngle)));
-            part.worldPosition = 
-                parent.worldPosition + 
-                mul(parent.worldRotation , 
-                (1.5f * scale * part.direction));
-            parts[i] = part;
-            float3x3 r = float3x3(part.worldRotation) * scale;
-            matrices[i] = float3x4(r.c0, r.c1, r.c2, part.worldPosition);
-        }
-    }
-
-    static float3[] directions = {
-        up(), right(), left(), forward(), back()
-    };
     
     static quaternion[] rotations = { 
         quaternion.identity,
@@ -56,7 +26,7 @@ public class Fractal : MonoBehaviour
     
     struct FractalPart
     {
-        public float3 direction, worldPosition;
+        public float3 worldPosition;
         public quaternion rotation, worldRotation;
         public float spinAngle;
     }
@@ -73,6 +43,46 @@ public class Fractal : MonoBehaviour
         colorBId = Shader.PropertyToID("_ColorB");
 
     Vector4[] sequenceNumbers;
+    
+    [BurstCompile(FloatPrecision.Standard, FloatMode.Fast, CompileSynchronously = true)]
+    struct UpdateFractalLevelJob : IJobFor
+    {
+        public float spinAngleDelta;
+        public float scale;
+
+        public NativeArray<FractalPart> parts;
+        
+        [ReadOnly]
+        public NativeArray<FractalPart> parents;
+        [WriteOnly]
+        public NativeArray<float3x4> matrices;
+        public void Execute(int i) {
+            FractalPart parent = parents[i / 5];
+            FractalPart part = parts[i];
+            part.spinAngle += spinAngleDelta;
+                
+            float3 upAxis = mul(mul(parent.worldRotation, part.rotation), up());
+            float3 sagAxis = cross(up(), upAxis);
+            float sagMagnitude = length(sagAxis);
+            quaternion baseRotation;
+            if (sagMagnitude > 0f) {
+                sagAxis /= sagMagnitude; //normalize vector
+                quaternion sagRotation = quaternion.AxisAngle(sagAxis, 0.25f * PI);
+                baseRotation = mul(sagRotation, parent.worldRotation);
+            } else {
+                baseRotation = parent.worldRotation;
+            }
+            
+            part.worldRotation = mul(baseRotation, mul(part.rotation, quaternion.RotateY(part.spinAngle)));
+            part.worldPosition = 
+                parent.worldPosition + 
+                mul(part.worldRotation,
+                (float3(0, 1.5f * scale, 0)));
+            parts[i] = part;
+            float3x3 r = float3x3(part.worldRotation) * scale;
+            matrices[i] = float3x4(r.c0, r.c1, r.c2, part.worldPosition);
+        }
+    }
     
     void OnEnable() {
         parts = new NativeArray<FractalPart>[depth];
@@ -113,7 +123,6 @@ public class Fractal : MonoBehaviour
     }
 
     FractalPart CreatePart(int childIndex) => new FractalPart {
-        direction = directions[childIndex],
         rotation = rotations[childIndex],
     };
     
